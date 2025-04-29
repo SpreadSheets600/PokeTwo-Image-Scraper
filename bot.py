@@ -1,14 +1,18 @@
 import os
 import re
+import trace
 import cv2
 
 import time
 import emoji
+import shutil
 import discord
 
 import asyncio
 import requests
 import threading
+import traceback
+import subprocess
 import unicodedata
 
 import numpy as np
@@ -29,6 +33,8 @@ upload_started_time = time.time()
 scheduler = AsyncIOScheduler()
 
 uploading = False
+batch_size = 1000
+folder_per_batch = 50
 images_per_class = 90
 total_pokemon_count = 0
 upload_lock = threading.Lock()
@@ -121,29 +127,55 @@ def upload_pokemons_to_huggingface():
         return
 
     uploading = True
+    upload_started_time = time.time()
 
     try:
-        commit_msg = f"FEAT: Upload - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-
         api = HfApi(token=HF_TOKEN)
-        api.upload_folder(
-            folder_path="pokemons",
-            repo_id="Hugging Face Repo",
-            repo_type="dataset",
-            commit_message=commit_msg,
+        all_folders = sorted(
+            [
+                f
+                for f in os.listdir("pokemons")
+                if os.path.isdir(os.path.join("pokemons", f))
+            ]
         )
+        total = len(all_folders)
+        print(f"[i] Found {total} Pokémon Folders TO Upload")
 
-        print("[+] Upload Complete!")
-        return True
+        for i in range(0, total, folder_per_batch):
+            batch = all_folders[i : i + folder_per_batch]
+            temp_dir = os.path.join("pokemons", "__temp_upload__")
+            os.makedirs(temp_dir, exist_ok=True)
+
+            for folder in batch:
+                src = os.path.join("pokemons", folder)
+                dst = os.path.join(temp_dir, folder)
+                shutil.copytree(src, dst)
+
+            commit_msg = f"Upload batch {i}-{i+len(batch)} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            try:
+                api.upload_folder(
+                    folder_path=temp_dir,
+                    repo_id="SpreadSheets600/Poketwo-Spawn-Images",
+                    repo_type="dataset",
+                    commit_message=commit_msg,
+                )
+                print(f"[+] Uploaded Pokémon Batch : {batch}")
+            except Exception as e:
+                print(f"[❌] Failed To Upload Batch {batch} : {e}")
+            finally:
+                shutil.rmtree(temp_dir)
+
+            time.sleep(2)
+
+        print("[✅] All Folders Uploaded Successfully!")
 
     except Exception as e:
         print(f"[❌] Upload Failed : {e}")
-        return False
+        traceback.print_exc()
 
     finally:
         if time.time() - upload_started_time > 60 * 15:
             print("[!] Upload Timeout Triggered.")
-
         uploading = False
 
 
