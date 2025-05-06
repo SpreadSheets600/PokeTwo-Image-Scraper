@@ -18,15 +18,15 @@ import unicodedata
 import numpy as np
 
 from datetime import datetime
-from huggingface_hub import HfApi, HfFolder, Repository
 from discord_webhook import DiscordWebhook, DiscordEmbed
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from huggingface_hub import HfApi, HfFolder, Repository, list_repo_files
 
-WEBH_URL = "Webhook URL" # Webhook For Image Scrapper Logs
-DC_TOKEN = "Discord Bot Token" # Token For Discord Bot To Collect Images - https://discord.com/developers/applications
-AUTO_UPLOAD_CHANNEL_ID = 00000000000 # Discord Uploader Log Channel
+WEBH_URL = "Webhook URL"  # Webhook For Image Scrapper Logs
+DC_TOKEN = "Discord Bot Token"  # Token For Discord Bot To Collect Images - https://discord.com/developers/applications
+AUTO_UPLOAD_CHANNEL_ID = 00000000000  # Discord Uploader Log Channel
 
-HF_TOKEN = "Hugging Face Token" # Token For Hugging Face Uplaods - https://huggingface.co/settings/tokens
+HF_TOKEN = "Hugging Face Token"  # Token For Hugging Face Uplaods - https://huggingface.co/settings/tokens
 HfFolder.save_token(HF_TOKEN)
 
 upload_started_time = time.time()
@@ -153,7 +153,7 @@ def upload_pokemons_to_huggingface():
 
             commit_msg = f"Upload batch {i}-{i+len(batch)} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             try:
-                api.upload_folder(
+                api.upload_large_folder(
                     folder_path=temp_dir,
                     repo_id="SpreadSheets600/Poketwo-Spawn-Images",
                     repo_type="dataset",
@@ -177,6 +177,14 @@ def upload_pokemons_to_huggingface():
         if time.time() - upload_started_time > 60 * 15:
             print("[!] Upload Timeout Triggered.")
         uploading = False
+
+
+def get_dataset_length():
+
+    files = list_repo_files(
+        repo_id="SpreadSheets600/Poketwo-Spawn-Images", repo_type="dataset"
+    )
+    return len(files)
 
 
 class PokemonCollector(discord.Bot):
@@ -208,6 +216,12 @@ class PokemonCollector(discord.Bot):
                 asyncio.run_coroutine_threadsafe(coro, self.loop)
 
             threading.Thread(target=threaded_upload).start()
+
+        @self.command(name="dataset", description="Get The Length Of The Dataset")
+        async def dataset(ctx):
+
+            images = get_dataset_length()
+            await ctx.respond(f"📷 Total No Of Images In Dataset : {images}")
 
     async def on_ready(self):
         print(f"[+] Logged In As {self.user} ({self.user.id})")
