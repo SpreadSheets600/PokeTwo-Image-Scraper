@@ -157,7 +157,6 @@ def upload_pokemons_to_huggingface():
                     folder_path=temp_dir,
                     repo_id="SpreadSheets600/Poketwo-Spawn-Images",
                     repo_type="dataset",
-                    commit_message=commit_msg,
                 )
                 print(f"[+] Uploaded Pokémon Batch : {batch}")
             except Exception as e:
